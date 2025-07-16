@@ -1,0 +1,5 @@
+repo init -u https://github.com/LineageOS/android.git -b lineage-22.2 --git-lfs
+git clone https://github.com/Joe7500/device_xiaomi_chime device/xiaomi/chime -b lineage-22.2
+git clone https://github.com/Joe7500/vendor_xiaomi_chime vendor/xiaomi/chime -b lineage-22.2
+git clone https://github.com/Joe7500/kernel_xiaomi_chime kernel/xiaomi/chime -b ksu
+git clone https://github.com/lineageos/android_hardware_xiaomi hardware/xiaomi -b lineage-22.2
