@@ -9,6 +9,11 @@ name: Generate Manifests
 on:
   workflow_dispatch:
   push:
+
+concurrency:
+  group: generate-manifests-${{ github.actor }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Generate Local Manifests by ${{ github.actor }}
@@ -41,17 +46,17 @@ jobs:
 
     - name: Execute script
       run: |
-          filename=$(find . -type f -name "*.txt" | sed 's/\.\///g' | sed 's/\.txt//g')
-          echo "$filename"
-          mkdir -p "$filename"
-          echo "filename=$filename" >> "$GITHUB_ENV"
-          rm local_manifests.xml || true
-          bash adapt.sh $filename.txt
-          mv local_manifests.xml $filename/
+        filename=$(find . -type f -name "*.txt" | sed 's/\.\///g' | sed 's/\.txt//g')
+        echo "$filename"
+        mkdir -p "$filename"
+        echo "filename=$filename" >> "$GITHUB_ENV"
+        rm local_manifests.xml || true
+        bash adapt.sh $filename.txt
+        mv local_manifests.xml $filename/
 
-          echo "TESTING=$(cat test_status)" >> "$GITHUB_ENV"
-          echo "TESTING_URL=$(cat url)" >> "$GITHUB_ENV"
-          echo "TESTING_BRANCH=$(cat branch)" >> "$GITHUB_ENV"
+        echo "TESTING=$(cat test_status)" >> "$GITHUB_ENV"
+        echo "TESTING_URL=$(cat url)" >> "$GITHUB_ENV"
+        echo "TESTING_BRANCH=$(cat branch)" >> "$GITHUB_ENV"
 
     - name: Push to Github as Repository
       run: |
@@ -68,25 +73,29 @@ jobs:
 
     - name: Run Workflow to Check Manifests
       run: |
-       if [ -f "test_status" ]; then
-        USERNAME=${{ github.actor }}
-        TOKEN=${{ secrets.PAT }}
+        if [ -f "test_status" ]; then
+          USERNAME=${{ github.actor }}
+          TOKEN=${{ secrets.PAT }}
 
-        bash check.sh --user $USERNAME --token $TOKEN
+          bash check.sh --user $USERNAME --token $TOKEN
 
-        if ! command -v gh &> /dev/null
-          then
-          echo "gh could not be found. Installing gh..."
-          curl -sS https://webi.sh/gh | sh
-          source ~/.config/envman/PATH.env
-          echo "gh installed."
+          if ! command -v gh &> /dev/null; then
+            echo "gh could not be found. Installing gh..."
+            curl -sS https://webi.sh/gh | sh
+            source ~/.config/envman/PATH.env
+            echo "gh installed."
+          fi
+
+          git clone https://$USERNAME:$TOKEN@github.com/$USERNAME/Manifest_Tester
+          cd Manifest_Tester
+          gh repo set-default https://github.com/$USERNAME/Manifest_Tester.git
+
+          gh workflow run main.yml \
+            -f LOCAL_MANIFEST_URL="https://github.com/$USERNAME/local_manifests_$filename" \
+            -f LOCAL_MANIFEST_BRANCH="$filename" \
+            -f ROM_MANIFEST_URL="$TESTING_URL" \
+            -f ROM_MANIFEST_BRANCH="$TESTING_BRANCH" \
+            -f CHOICE="LOCAL_MANIFEST"
+
+          echo "Testing Started! Please Check https://github.com/$USERNAME/Manifest_Tester/actions"
         fi
-
-        git clone https://$USERNAME:$TOKEN@github.com/$USERNAME/Manifest_Tester
-        cd Manifest_Tester
-        gh repo set-default https://github.com/$USERNAME/Manifest_Tester.git
-        
-        gh workflow run main.yml -f LOCAL_MANIFEST_URL="https://github.com/$USERNAME/local_manifests_$filename" -f LOCAL_MANIFEST_BRANCH="$filename" -f ROM_MANIFEST_URL="$TESTING_URL" -f ROM_MANIFEST_BRANCH="$TESTING_BRANCH" -f CHOICE="LOCAL_MANIFEST"
-
-        echo "Testing Started! Please Check https://github.com/$USERNAME/Manifest_Tester/actions"
-       fi
